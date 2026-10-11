@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -11,17 +12,26 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const IS_VERCEL = Boolean(process.env.VERCEL);
 
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Data directory for persistent server-side conversation history
-const DATA_DIR = path.join(__dirname, "data");
+// Data directory: use /tmp on Vercel (serverless read-only root) or ./data locally
+const DATA_DIR = IS_VERCEL
+  ? path.join(os.tmpdir(), "nova-ai-data")
+  : path.join(__dirname, "data");
 const CONVERSATIONS_FILE = path.join(DATA_DIR, "conversations.json");
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn("Using in-memory fallback for conversation store:", err.message);
 }
+
+let memoryConversations = [];
 
 // Supported current Gemini models
 const ALLOWED_MODELS = new Set([
@@ -72,26 +82,27 @@ const PROMPT_SUGGESTIONS = [
 function loadConversations() {
   try {
     if (!fs.existsSync(CONVERSATIONS_FILE)) {
-      return [];
+      return memoryConversations;
     }
     const raw = fs.readFileSync(CONVERSATIONS_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.error("Failed to read conversations store:", err.message);
-    return [];
+    memoryConversations = Array.isArray(parsed) ? parsed : [];
+    return memoryConversations;
+  } catch {
+    return memoryConversations;
   }
 }
 
 function saveConversations(conversations) {
+  memoryConversations = conversations;
   try {
     fs.writeFileSync(
       CONVERSATIONS_FILE,
       JSON.stringify(conversations, null, 2),
       "utf8"
     );
-  } catch (err) {
-    console.error("Failed to write conversations store:", err.message);
+  } catch {
+    // Fallback to memoryConversations on read-only environments
   }
 }
 
@@ -130,26 +141,28 @@ app.post("/api/config/apikey", (req, res) => {
   process.env.GEMINI_API_KEY = cleanKey;
 
   try {
-    const envPath = path.join(__dirname, ".env");
-    let envContent = "";
-    if (fs.existsSync(envPath)) {
-      envContent = fs.readFileSync(envPath, "utf8");
-      if (/^GEMINI_API_KEY=/m.test(envContent)) {
-        envContent = envContent.replace(
-          /^GEMINI_API_KEY=.*$/m,
-          `GEMINI_API_KEY=${cleanKey}`
-        );
+    if (!IS_VERCEL) {
+      const envPath = path.join(__dirname, ".env");
+      let envContent = "";
+      if (fs.existsSync(envPath)) {
+        envContent = fs.readFileSync(envPath, "utf8");
+        if (/^GEMINI_API_KEY=/m.test(envContent)) {
+          envContent = envContent.replace(
+            /^GEMINI_API_KEY=.*$/m,
+            `GEMINI_API_KEY=${cleanKey}`
+          );
+        } else {
+          envContent += `\nGEMINI_API_KEY=${cleanKey}\n`;
+        }
       } else {
-        envContent += `\nGEMINI_API_KEY=${cleanKey}\n`;
+        envContent = `GEMINI_API_KEY=${cleanKey}\nPORT=${PORT}\n`;
       }
-    } else {
-      envContent = `GEMINI_API_KEY=${cleanKey}\nPORT=${PORT}\n`;
+      fs.writeFileSync(envPath, envContent, { encoding: "utf8", mode: 0o600 });
     }
-    fs.writeFileSync(envPath, envContent, { encoding: "utf8", mode: 0o600 });
     return res.json({
       success: true,
       apiKeyConfigured: true,
-      message: "API key securely saved on backend (.env).",
+      message: "API key securely saved on backend.",
     });
   } catch {
     return res.json({
@@ -314,7 +327,6 @@ app.post("/api/chat/stream", async (req, res) => {
     userMessageId: userMsg.id,
   });
 
-  // Track if client explicitly disconnects before response completes
   let clientAborted = false;
   res.on("close", () => {
     if (!res.writableEnded) {
@@ -346,7 +358,6 @@ app.post("/api/chat/stream", async (req, res) => {
     try {
       stream = await createStream(true);
     } catch (firstErr) {
-      // Fallback if previous_interaction_id expired or model changed
       if (conv.lastInteractionId) {
         stream = await createStream(false);
       } else {
@@ -403,7 +414,9 @@ app.post("/api/chat/stream", async (req, res) => {
       const assistantMsg = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: accumulatedText || "I couldn't generate a response. Please try again.",
+        content:
+          accumulatedText ||
+          "I couldn't generate a response. Please try again.",
         thoughtSummary: accumulatedThought || null,
         interactionId: latestInteractionId,
         usage: tokenUsage,
@@ -450,9 +463,13 @@ function generateTitleFromMessage(text) {
   return cleaned.slice(0, 38).trim() + "…";
 }
 
-app.listen(PORT, () => {
-  console.log(`\n✨ Nova AI Assistant running at http://localhost:${PORT}`);
-  console.log(
-    `🔒 Backend GEMINI_API_KEY configured: ${isApiKeyConfigured() ? "YES ✅" : "NO ⚠️"}`
-  );
-});
+if (!IS_VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`\n✨ Nova AI Assistant running at http://localhost:${PORT}`);
+    console.log(
+      `🔒 Backend GEMINI_API_KEY configured: ${isApiKeyConfigured() ? "YES ✅" : "NO ⚠️"}`
+    );
+  });
+}
+
+export default app;
