@@ -1,4 +1,4 @@
-# ✨ Nova AI — Personal Chat Assistant
+# ✨ Shivam AI — Personal Chat Assistant
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-0d9488.svg)
 ![Node.js](https://img.shields.io/badge/Node.js-v20%2B-10b981.svg)

@@ -43,7 +43,7 @@ const ALLOWED_MODELS = new Set([
 const DEFAULT_MODEL = "gemini-3.8-flash";
 
 const DEFAULT_SYSTEM_INSTRUCTION =
-  "You are Nova, a warm, intelligent, and helpful AI assistant. Reply naturally in the language/style the user uses (English, Hindi, or Hinglish). Keep explanations clear, conversational, and well-structured using Markdown when helpful.";
+  "You are Shivam AI, a warm, intelligent, and helpful AI assistant. Reply naturally in the language/style the user uses (English, Hindi, or Hinglish). Keep explanations clear, conversational, and well-structured using Markdown when helpful.";
 
 // Clean, Minimal Starter Prompt Suggestions
 const PROMPT_SUGGESTIONS = [
@@ -465,7 +465,7 @@ function generateTitleFromMessage(text) {
 
 if (!IS_VERCEL) {
   app.listen(PORT, () => {
-    console.log(`\n✨ Nova AI Assistant running at http://localhost:${PORT}`);
+    console.log(`\n✨ Shivam AI Assistant running at http://localhost:${PORT}`);
     console.log(
       `🔒 Backend GEMINI_API_KEY configured: ${isApiKeyConfigured() ? "YES ✅" : "NO ⚠️"}`
     );

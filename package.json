@@ -1,5 +1,5 @@
 {
-  "name": "nova-ai-assistant",
+  "name": "shivam-ai-assistant",
   "version": "1.0.0",
   "description": "Minimal, professional AI Chat Assistant with real-time SSE streaming, conversation history, prompt suggestions, and secure backend Gemini API key isolation",
   "type": "module",

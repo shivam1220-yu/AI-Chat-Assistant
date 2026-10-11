@@ -5,7 +5,7 @@ const state = {
   promptSuggestions: [],
   selectedModel: "gemini-3.8-flash",
   systemInstruction:
-    "You are Nova, a warm, intelligent, and helpful AI assistant. Reply naturally in the language/style the user uses (English, Hindi, or Hinglish). Keep explanations clear, conversational, and well-structured using Markdown when helpful.",
+    "You are Shivam AI, a warm, intelligent, and helpful AI assistant. Reply naturally in the language/style the user uses (English, Hindi, or Hinglish). Keep explanations clear, conversational, and well-structured using Markdown when helpful.",
   isStreaming: false,
   abortController: null,
   apiKeyConfigured: false,
@@ -832,7 +832,7 @@ function exportCurrentConversation() {
   ];
 
   for (const m of conv.messages) {
-    const speaker = m.role === "user" ? "### User" : "### Nova AI";
+    const speaker = m.role === "user" ? "### User" : "### Shivam AI";
     lines.push(speaker, "", m.content, "", "---", "");
   }
 
